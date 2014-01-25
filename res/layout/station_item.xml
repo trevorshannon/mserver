@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="48dp">
+    
+    <TextView
+        android:layout_height="match_parent" 
+        android:layout_width="match_parent"
+        android:id="@+id/station_name"
+        android:textSize="18sp"
+        android:textColor="@color/light_black"
+        android:background="@drawable/list_item_color"
+        android:layout_gravity="fill_horizontal" 
+        android:gravity="center_vertical" 
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:text="List Item 0"
+        android:padding="8dp"/>    
+    
+
+</RelativeLayout>

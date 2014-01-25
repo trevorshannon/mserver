@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+         android:orientation="vertical"
+         android:layout_width="match_parent"
+         android:layout_height="match_parent"
+         android:background="@color/light_grey">
+         
+    <ListView
+        android:id="@android:id/list"
+        android:layout_height="match_parent" 
+        android:layout_width="match_parent"
+        android:layout_gravity="start"
+        android:choiceMode="singleChoice"
+        android:divider="@color/light_grey"
+        android:dividerHeight="1.5dp"/> 
+        
+    <TextView
+        android:id="@android:id/empty"
+        android:layout_height="48dp"
+        android:layout_width="match_parent"
+        android:textSize="20sp"
+        android:textColor="@color/light_black"
+        android:background="@color/light_grey"
+        android:gravity="center" 
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:padding="8dp"
+        android:text="No songs"/>
+    
+
+</LinearLayout>

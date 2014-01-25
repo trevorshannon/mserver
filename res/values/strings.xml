@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">mserver</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_search">Search</string>
+    <string name="search_hint">Search music</string>
+    <string name="drawer_open">Open Drawer</string>
+    <string name="drawer_close">Close Drawer</string>
+    
+    <string name="disconnected">Disconnected</string>
+    <string name="connected">Connected</string>
+    <string name="loading">Loading</string>
+    <string name="loading_tracks">Loading Tracks</string>
+    <string name="loading_stations">Loading Stations</string>
+    
+
+    <string-array name="top_modes">
+        <item>Library</item>
+        <item>Radio</item>
+        <item>Internet</item>
+    </string-array>
+
+    <string name="title_activity_search">Search</string>
+
+</resources>

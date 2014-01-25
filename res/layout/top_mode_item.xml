@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="52dp" >
+    
+    <TextView
+        android:id="@+id/mode_name"
+        android:textSize="22sp"
+        android:gravity="center_vertical"
+        android:layout_height="fill_parent" 
+        android:layout_width="fill_parent" 
+        android:text="List Item 0"
+        android:textColor="@color/light_black"
+        android:background="@drawable/top_mode_item_color"
+        android:paddingLeft="16dp"/>    
+
+</RelativeLayout>
