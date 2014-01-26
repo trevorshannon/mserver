@@ -170,18 +170,19 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 		radioAdapter = new ArrayAdapter<RadioStation>(getApplicationContext(), R.layout.station_item, R.id.station_name, stations);
 		radioSearchAdapter = new ArrayAdapter<RadioStation>(getApplicationContext(), R.layout.station_item, R.id.station_name, filteredStations);
 		
+		//initialize to library
+		//TODO: initialize the mode based on saved instance state
 		selectItem(MODE_LIBRARY);
 
 		if (tracksInvalid){
+			//get tracks from the server only if required
 			new TrackDownloader().execute("http://10.1.10.12/getlibrary.php");
 		}
 	}
 	
 	@Override
 	public void onPause(){
-		super.onPause();
-		
-		//TODO: save current mode
+		super.onPause();	
 		comm.end();
 	}
 	
@@ -195,7 +196,9 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 	
 	@Override 
 	public void onSaveInstanceState(Bundle savedInstanceState){
+		//save list of tracks so a server request is not needed later
 		savedInstanceState.putParcelableArrayList(STATE_TRACKS, tracks);
+		//save current mode
 		savedInstanceState.putInt(STATE_MODE, DrawerList.getCheckedItemPosition());
 		super.onSaveInstanceState(savedInstanceState);
 	}
@@ -207,7 +210,9 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 	    MenuInflater inflater = getMenuInflater();
 	    inflater.inflate(R.menu.main, menu);
 	    
+	    //get the search view
 	    final SearchView searchView = (SearchView) menu.findItem(R.id.action_search).getActionView();
+	    //set listeners
 	    searchView.setOnCloseListener(new SearchView.OnCloseListener(){
 
 			@Override
@@ -217,9 +222,11 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 				int currentMode = DrawerList.getCheckedItemPosition();
 				switch (currentMode){
 				case MODE_LIBRARY:
+					//go back to the full list of tracks
 					fragment.setListAdapter(libraryAdapter);
 					break;
 				case MODE_RADIO:
+					//go back to the full list of stations
 					fragment.setListAdapter(radioAdapter);
 					break;
 				case MODE_INTERNET: 
@@ -242,10 +249,12 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 				switch (currentMode){
 				case MODE_LIBRARY:
 					filteredTracks.clear();
+					//switch to a filtered list of tracks
 					fragment.setListAdapter(librarySearchAdapter);
 					break;
 				case MODE_RADIO:
 					filteredStations.clear();
+					//switch to a filtered list of stations
 					fragment.setListAdapter(radioSearchAdapter);
 					break;
 				case MODE_INTERNET: 
@@ -265,7 +274,8 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 			}
 			
 			@Override
-			public boolean onQueryTextChange(String newText) {				
+			public boolean onQueryTextChange(String newText) {		
+				//update search results
 				int currentMode = DrawerList.getCheckedItemPosition();
 				switch (currentMode){
 				case MODE_LIBRARY:
@@ -398,10 +408,12 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 		RelativeLayout connectedView = (RelativeLayout) findViewById(R.id.connection_status);
 		TextView connectedText = (TextView) findViewById(R.id.connection_text);
 		if (!connected){
+			//show 'disconnected' notification
 			connectedView.setVisibility(View.VISIBLE);
 			connectedText.setText(R.string.disconnected);
 		}
 		else{
+			//hide 'disconnected' notification
 			connectedView.setVisibility(View.GONE);
 			connectedText.setText(R.string.connected);
 		}
@@ -418,6 +430,7 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 		FragmentManager fragmentManager = getSupportFragmentManager();
 		ListFragment fragment = (ListFragment) fragmentManager.findFragmentById(R.id.music_content);
 		ListAdapter adapter = fragment.getListAdapter();
+		//generate playlist starting with selected track
 		for (int i = 0; i < DEFAULT_PLAYLIST_LENGTH; i++){
 			if ((position + i) < adapter.getCount()){
 				playlist.add((Track)(adapter.getItem(position + i)));
@@ -431,6 +444,7 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 		ObjectMapper mapper = new ObjectMapper();
 		StringWriter writer = new StringWriter();
 		try{
+			//create json
 			mapper.writeValue(writer, playlist);
 			writer.close();
 		}
@@ -508,6 +522,7 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 	public void showPlayPause(){
 		ImageButton playButton = (ImageButton) findViewById(R.id.play);
 		ImageButton pauseButton = (ImageButton) findViewById(R.id.pause);
+		//show the correct play/pause button based on current state
 		if (playing){			
 			playButton.setVisibility(View.GONE);
 			pauseButton.setVisibility(View.VISIBLE);
@@ -521,11 +536,13 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 	private class TrackDownloader extends AsyncTask<String, Integer, Boolean>{
 		
 		protected Boolean doInBackground(String... urls){
+			//get tracks from the server
 			try{
 				ObjectMapper mapper = new ObjectMapper();
 				URL url = new URL("http://10.1.10.12/getlibrary.php");
 				JsonNode root = mapper.readTree(url);
 				tracks.clear();
+				//parse json into list of Tracks
 				Iterator<JsonNode> tracksIterator = root.getElements();
 				while (tracksIterator.hasNext()){
 					Track track = mapper.readValue(tracksIterator.next(), Track.class);
@@ -541,7 +558,7 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 		
 		protected void onPreExecute(){
 			Log.d(TAG, "fetching library tracks...");
-			//setProgressBarIndeterminateVisibility(true);
+			//show loading notification
 			LinearLayout pb = (LinearLayout) findViewById(R.id.loading_layout);
 			pb.setVisibility(View.VISIBLE);
 			
@@ -553,8 +570,10 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 				libraryAdapter.notifyDataSetChanged();
 			}
 			else{
+				Toast.makeText(getApplicationContext(), "Unable to retrieve library", Toast.LENGTH_SHORT).show();
 				Log.e(TAG, "could not get library tracks from server");
 			}
+			//hide loading notification
 			LinearLayout pb = (LinearLayout) findViewById(R.id.loading_layout);
 			pb.setVisibility(View.GONE);
 		}
