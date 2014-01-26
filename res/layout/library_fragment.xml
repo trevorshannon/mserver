@@ -5,7 +5,14 @@
          android:layout_height="match_parent"
          android:background="@color/light_grey">
          
-    <ListView
+   <!-- <ExpandableListView
+        android:id="@+id/expandable_list"
+        android:layout_height="match_parent"
+        android:layout_width="match_parent"
+        android:divider="@color/light_grey"
+        android:dividerHeight="1.5dp"/> -->
+        
+   <ListView
         android:id="@android:id/list"
         android:layout_height="match_parent" 
         android:layout_width="match_parent"
@@ -25,7 +32,6 @@
         android:singleLine="true"
         android:ellipsize="end"
         android:padding="8dp"
-        android:text="No songs"/>
-    
+        android:text="No songs"/>    
 
 </LinearLayout>

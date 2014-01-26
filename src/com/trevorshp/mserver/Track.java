@@ -14,7 +14,7 @@ public class Track implements Parcelable{
 	}
 	
 	public String toString(){
-		return this.title + " | " + this.artist;
+		return this.title;
 	}
 
 

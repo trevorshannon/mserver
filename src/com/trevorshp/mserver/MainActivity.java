@@ -3,8 +3,14 @@ package com.trevorshp.mserver;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.JsonParseException;
@@ -29,7 +35,6 @@ import android.view.View.OnClickListener;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.ExpandableListAdapter;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ListAdapter;
@@ -39,18 +44,14 @@ import android.widget.SearchView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.trevorshp.mserver.ArtistsFragment.OnArtistSelectedListener;
 import com.trevorshp.mserver.LibraryFragment.OnTrackSelectedListener;
 import com.trevorshp.mserver.RadioFragment.OnStationSelectedListener;
 
 import de.tavendo.autobahn.WebSocketHandler;
 
-//TODO: organize library by artist.  expandable listview?
-//TODO: auto-reconnect if connection is lost
-
-public class MainActivity extends FragmentActivity implements OnStationSelectedListener, 
-																OnTrackSelectedListener
-																{
-
+public class MainActivity extends FragmentActivity implements OnArtistSelectedListener, OnTrackSelectedListener, OnStationSelectedListener {
+	
 	private static final String TAG = "mserver"; 
 	private static final int MODE_LIBRARY  = 0;
 	private static final int MODE_RADIO = 1;
@@ -72,6 +73,7 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 	private ArrayAdapter radioAdapter;
 	private ArrayAdapter librarySearchAdapter;
 	private ArrayAdapter radioSearchAdapter;
+	private ArrayAdapter internetAdapter;
 
 	private boolean tracksInvalid;
 	private boolean playing;
@@ -80,6 +82,9 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 	private ArrayList<RadioStation> filteredStations;
 	private ArrayList<Track> tracks;
 	private ArrayList<Track> filteredTracks;
+	private Map<String, ArrayList<Track>> byArtist;
+	private ArrayList<String> artistNames;
+	private ArrayList<Track> webResults;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -123,8 +128,12 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 		stations = new ArrayList<RadioStation>();
 		filteredStations = new ArrayList<RadioStation>();
 		filteredTracks = new ArrayList<Track>();
+		artistNames = new ArrayList<String>();
+		byArtist = new HashMap<String, ArrayList<Track>>();
+		webResults = new ArrayList<Track>();
 		if (savedInstanceState != null){
 			tracks = savedInstanceState.getParcelableArrayList(STATE_TRACKS);
+			generateArtistHash();
 			//TODO: figure out why this line causes No Tracks and No Stations to be shown
 			//selectItem(savedInstanceState.getInt(STATE_MODE));
 			tracksInvalid = false;
@@ -136,7 +145,7 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 			//selectItem(MODE_LIBRARY);
 		}
 
-		// Set the adapter for the list view
+		// Set the adapter for the draw list view
 		DrawerList.setAdapter(new ArrayAdapter<String>(this, R.layout.top_mode_item, R.id.mode_name, topModes));
 		// Set the list's click listener
 		DrawerList.setOnItemClickListener(new DrawerItemClickListener());
@@ -161,14 +170,16 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 
 		// Set the drawer toggle as the DrawerListener
 		DrawerLayout.setDrawerListener(DrawerToggle);
+		//DrawerLayout.setFocusableInTouchMode(false);
 
 		getActionBar().setDisplayHomeAsUpEnabled(true);
 		getActionBar().setHomeButtonEnabled(true);
 		
-		libraryAdapter = new ArrayAdapter<Track>(getApplicationContext(), R.layout.station_item, R.id.station_name, tracks);
+		libraryAdapter = new ArrayAdapter<String>(getApplicationContext(), R.layout.station_item, R.id.station_name, artistNames);
 		librarySearchAdapter = new ArrayAdapter<Track>(getApplicationContext(), R.layout.station_item, R.id.station_name, filteredTracks);
 		radioAdapter = new ArrayAdapter<RadioStation>(getApplicationContext(), R.layout.station_item, R.id.station_name, stations);
 		radioSearchAdapter = new ArrayAdapter<RadioStation>(getApplicationContext(), R.layout.station_item, R.id.station_name, filteredStations);
+//		internetAdapter = new ArrayAdapter<Track>(getApplicationContext(), R.layout.station_item, R.id.station_name, );
 		
 		//initialize to library
 		//TODO: initialize the mode based on saved instance state
@@ -249,8 +260,17 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 				switch (currentMode){
 				case MODE_LIBRARY:
 					filteredTracks.clear();
+					//switch fragments to show tracks
+					ListFragment tracksFragment = new LibraryFragment();
+					tracksFragment.setListAdapter(librarySearchAdapter);
+					
+					// Insert the fragment by replacing any existing fragment
+					fragmentManager.beginTransaction()
+					.replace(R.id.music_content, tracksFragment)
+					//.addToBackStack(null)
+					.commit();
 					//switch to a filtered list of tracks
-					fragment.setListAdapter(librarySearchAdapter);
+					//fragment.setListAdapter(librarySearchAdapter);
 					break;
 				case MODE_RADIO:
 					filteredStations.clear();
@@ -270,7 +290,12 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 				//close keyboard (http://stackoverflow.com/questions/1109022/close-hide-the-android-soft-keyboard)
 				InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
 				imm.hideSoftInputFromWindow(searchView.getWindowToken(), 0);
-				return true;
+
+				if (DrawerList.getCheckedItemPosition() == MODE_INTERNET){
+					//no instant search for internet mode.  perform the search here.
+					new WebSearch().execute(query);
+				}
+				return true;		
 			}
 			
 			@Override
@@ -418,6 +443,24 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 			connectedText.setText(R.string.connected);
 		}
 	}
+	
+	@Override
+	public void onArtistSelected(int position){
+		String artistName = artistNames.get(position);
+		//setTitle(artistName);
+		//switch fragments to show tracks
+		ListFragment tracksFragment = new LibraryFragment();
+		ArrayList<Track> artistTracks = byArtist.get(artistName);
+		tracksFragment.setListAdapter(new ArrayAdapter<Track>(this, R.layout.station_item, R.id.station_name, artistTracks));
+		
+		// Insert the fragment by replacing any existing fragment
+		FragmentManager fragmentManager = getSupportFragmentManager();
+		fragmentManager.beginTransaction()
+		.replace(R.id.music_content, tracksFragment)
+		.setBreadCrumbTitle(artistName)
+		.addToBackStack(null)
+		.commit();
+	}
 
 	@Override
 	public void onStationSelected(RadioStation station){
@@ -426,6 +469,7 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 	
 	@Override
 	public void onTrackSelected(int position){
+		
 		ArrayList<Track> playlist = new ArrayList<Track>();
 		FragmentManager fragmentManager = getSupportFragmentManager();
 		ListFragment fragment = (ListFragment) fragmentManager.findFragmentById(R.id.music_content);
@@ -482,12 +526,14 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 
 	@Override
 	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		
 		if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN){
 			voldown(null);
 		}
 		else if (keyCode == KeyEvent.KEYCODE_VOLUME_UP){
 			volup(null);
 		}
+		super.onKeyDown(keyCode, event);
 		return true;
 	}
 
@@ -553,6 +599,7 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 				Log.e(TAG, "Error parsing track json: " + e.getMessage());
 				return false;
 			}
+			generateArtistHash();
 			return true;
 		}
 		
@@ -563,8 +610,8 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 			pb.setVisibility(View.VISIBLE);
 			
 		}
-		protected void onPostExecute(Boolean result){
-			if (result){
+		protected void onPostExecute(Boolean success){
+			if (success){
 				Log.d(TAG, "got library tracks from server");
 				Toast.makeText(getApplicationContext(), "Retrieved library tracks", Toast.LENGTH_SHORT).show();
 				libraryAdapter.notifyDataSetChanged();
@@ -574,6 +621,53 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 				Log.e(TAG, "could not get library tracks from server");
 			}
 			//hide loading notification
+			LinearLayout pb = (LinearLayout) findViewById(R.id.loading_layout);
+			pb.setVisibility(View.GONE);
+		}
+	}
+	
+	private class WebSearch extends AsyncTask<String, Integer, Boolean>{
+		protected Boolean doInBackground(String...query){
+			webResults.clear();
+			try{
+				ObjectMapper mapper = new ObjectMapper();
+				URL url = new URL("https://www.googleapis.com/youtube/v3/search?part=snippet&q=" + URLEncoder.encode(query[0], "UTF-8") + "&type=video&maxResults=20&key=AIzaSyDkE1Q199bbUk5LNWI2PLY8mrlloJG-UUI");
+				Map<String, Object> res = mapper.readValue(url, Map.class);
+				//JsonNode root = mapper.readTree(url);
+				//manually build the track object
+				ArrayList<Object> items = (ArrayList<Object>)res.get("items");
+				for (int i = 0; i < items.size(); i++){
+					LinkedHashMap<String, Object> item = (LinkedHashMap<String, Object>)(items.get(i));
+					LinkedHashMap<String, Object> id = (LinkedHashMap<String, Object>)(item.get("id"));
+					LinkedHashMap<String, Object> snippet = (LinkedHashMap<String, Object>)(item.get("snippet"));
+					Log.d(TAG, snippet.get("title").toString());
+					Track track = new Track();
+					track.id = id.get("videoId").toString();
+					track.title = snippet.get("title").toString();
+					webResults.add(track);
+				}
+			}
+			catch(Exception e){
+				Log.e(TAG, "unable to fetch web results: " + e.getMessage());
+				return false;
+			}
+			return true;
+		}
+		
+		protected void onPreExecute(){
+			LinearLayout pb = (LinearLayout) findViewById(R.id.loading_layout);
+			pb.setVisibility(View.VISIBLE);
+		}
+		
+		protected void onPostExecute(Boolean success){
+			if (!success){	
+				Toast.makeText(getApplicationContext(), "Unable to perform search", Toast.LENGTH_SHORT).show();
+			}
+			else{
+				FragmentManager fragmentManager = getSupportFragmentManager();
+				ListFragment fragment = (ListFragment) fragmentManager.findFragmentById(R.id.music_content);
+				fragment.setListAdapter(new ArrayAdapter<Track>(getApplicationContext(), R.layout.station_item, R.id.station_name, webResults));
+			}
 			LinearLayout pb = (LinearLayout) findViewById(R.id.loading_layout);
 			pb.setVisibility(View.GONE);
 		}
@@ -591,12 +685,16 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 	private void selectItem(int position) {	
 		ListFragment fragment = new ListFragment();
 		if (position == MODE_LIBRARY) {
-			fragment = new LibraryFragment();
+			fragment = new ArtistsFragment();
 			fragment.setListAdapter(libraryAdapter);
 		}
-		if (position == MODE_RADIO){
+		else if (position == MODE_RADIO){
 			fragment = new RadioFragment();
 			fragment.setListAdapter(radioAdapter);
+		}
+		else if (position == MODE_INTERNET){
+			fragment = new LibraryFragment();
+			//fragment.setListAdapter(internetAdapter);
 		}
 
 		// Insert the fragment by replacing any existing fragment
@@ -615,5 +713,29 @@ public class MainActivity extends FragmentActivity implements OnStationSelectedL
 	public void setTitle(CharSequence title) {
 		this.title = title;
 		getActionBar().setTitle(title);
+	}
+	
+	public void generateArtistHash(){
+		//create Map from tracks list
+		for (int i = 0; i < tracks.size(); i++){
+			String artist = tracks.get(i).artist;
+			if (artist == null || artist.isEmpty()){
+				artist = "(no artist)";
+			}
+			if (byArtist.containsKey(artist)){
+				byArtist.get(artist).add(tracks.get(i));
+			}
+			else{
+				ArrayList<Track> trackList = new ArrayList<Track>();
+				trackList.add(tracks.get(i));
+				byArtist.put(artist, trackList);
+			}
+		}
+		artistNames.clear();
+		//get all artist names and put them in the adapter's data source
+		String[] arr = byArtist.keySet().toArray(new String[0]);
+		artistNames.addAll(Arrays.asList(arr));
+		//be sure to organize them first!
+		Collections.sort(artistNames);
 	}
 }
